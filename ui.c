@@ -1,22 +1,22 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-/* DigiChroma's UI: its Mod Menu entry, its screen, its keys and knobs, its MIDI CCs, its project data. While
+/* DigiPrism's UI: its Mod Menu entry, its screen, its keys and knobs, its MIDI CCs, its project data. While
  * it is open it owns the screen. With the source INPUTS (the default) it owns the audio while it is open, as
- * DigiCosm does, and NO gives it back; with DIGITONE the pedal stays on after NO (dchroma_owner.on) until BYPASS.
+ * DigiSwarm does, and NO gives it back; with DIGITONE the pedal stays on after NO (dprism_owner.on) until BYPASS.
  *
  *   three pages, as the Digitone's own (LEFT, RIGHT or PAGE moves between them):
  *     1 PRIMARY    TILT RATE TIME MIX / AMOUNT x4 (each named by its module's effect)   push: its default
  *     2 SECONDARY  SENS DRIFT DRIFT OUT / VOL x4  (also FUNC + a knob on page 1)
  *     3 MODULES    the four effects / ORDER, FILTER style, CAPTURE route, input LEVEL   push A-D: on/off
- *   T1-T4      the Chroma Console's four buttons: press for the module's next effect, hold to bypass it
+ *   T1-T4      the four module buttons: press for the module's next effect, hold to bypass it
  *   trig 13    GESTURE: record the knobs you turn; again to play them (FUNC + 13 erases every gesture)
  *   trig 15    the TAP footswitch: tap a tempo; hold to CAPTURE, release to play it; tap to stop it
  *   trig 16    the BYPASS footswitch (with DUAL BYPASS the chosen modules; twice quickly, everything)
  *   YES SETUP, NO back (from a page: close);  PLAY, STOP, RECORD, TEMPO and LEVEL/DATA stay stock
  *   presets: in SETUP a trig key 1-8 saves that preset; FUNC + a trig key 1-8 recalls one
- *   MIDI: the Chroma Console's CCs, on the auto channel (or any, in SETUP), while the page is open (or
+ *   MIDI: its CCs, on the auto channel (or any, in SETUP), while the page is open (or
  *   always, in SETUP) */
 #pragma GCC optimize ("no-tree-loop-distribute-patterns")
-#include "dchroma.h"
+#include "dprism.h"
 
 #define KEY_FUNC    1
 #define KEY_TEMPO   9
@@ -55,15 +55,15 @@ static const u8 fx_def[4] = { FX_DRIVE, FX_DOUBLER, FX_SPACE, FX_FILTER };
 static const char *const knob_lbl[4] = { "TILT", "RATE", "TIME", "MIX" };
 static const char *const sec_lbl[8] = { "SENS", "DRFT", "DRFT", "OUT", "VOL", "VOL", "VOL", "VOL" };
 static const char *const fx_lbl[4][5] = {
-    { "DRIV", "SWTN", "FUZZ", "HOWL", "SWEL" }, { "DUBL", "VIBR", "PHAS", "TREM", "PTCH" },
-    { "CASC", "REEL", "SPAC", "COLL", "REVR" }, { "FILT", "SQSH", "CASS", "BRKN", "INTF" } };
+    { "DRIV", "WARM", "FUZZ", "WAIL", "SWEL" }, { "DUBL", "VIBR", "PHAS", "TREM", "PTCH" },
+    { "ECHO", "TAPE", "SPAC", "SCAT", "REVR" }, { "FILT", "COMP", "LOFI", "GLCH", "STAT" } };
 static const char *const fx_name[4][5] = {
-    { "Drive", "Sweeten", "Fuzz", "Howl", "Swell" }, { "Doubler", "Vibrato", "Phaser", "Tremolo", "Pitch" },
-    { "Cascade", "Reels", "Space", "Collage", "Reverse" },
-    { "Filter", "Squash", "Cassette", "Broken", "Interference" } };
+    { "Drive", "Warmth", "Fuzz", "Wail", "Swell" }, { "Doubler", "Vibrato", "Phaser", "Tremolo", "Pitch" },
+    { "Echoes", "Tape", "Space", "Scatter", "Reverse" },
+    { "Filter", "Comp", "Lo-Fi", "Glitch", "Static" } };
 static const char *const styles[3] = { "TILT", "LPF", "HPF" };
 static const char *const levels[4] = { "LOW", "MED", "HIGH", "VHI" };
-static const char *const pg3_lbl[8] = { "CHAR", "MOVE", "DIFF", "TEXT", "ORDR", "FLTR", "CAPT", "LEVL" };
+static const char *const pg3_lbl[8] = { "COLR", "MOTN", "AMBI", "GRIT", "ORDR", "FLTR", "CAPT", "LEVL" };
 static const char *const cfg_lbl[G_COUNT] = { "SOURCE", "INPUT", "CLOCK", "BYPASS", "DUAL BYPASS", "MIDI CC",
                                               "CC CLOSED" };
 
@@ -103,27 +103,27 @@ static void defaults(void)
 {
     int i;
     for (i = 0; i < 8; i++) {
-        dchroma.knob[i] = knob_def[i];
-        dchroma.sec[i] = sec_def[i];
+        dprism.knob[i] = knob_def[i];
+        dprism.sec[i] = sec_def[i];
     }
     for (i = 0; i < 4; i++) {
-        dchroma.fx[i] = fx_def[i];
-        dchroma.on[i] = 1;
+        dprism.fx[i] = fx_def[i];
+        dprism.on[i] = 1;
     }
-    dchroma.order = 0;
-    dchroma.style = ST_TILT;
-    dchroma.croute = 0;
-    dchroma.level = 2;
-    dchroma.bypass = 1;                     /* off until it is opened: a project keeps its sound */
-    dchroma.trails = 1;
-    dchroma.clock = CL_FREE;
-    dchroma.tap = 14400;
-    dchroma.source = SRC_INPUTS;
-    dchroma.mono = 0;
+    dprism.order = 0;
+    dprism.style = ST_TILT;
+    dprism.croute = 0;
+    dprism.level = 2;
+    dprism.bypass = 1;                     /* off until it is opened: a project keeps its sound */
+    dprism.trails = 1;
+    dprism.clock = CL_FREE;
+    dprism.tap = 14400;
+    dprism.source = SRC_INPUTS;
+    dprism.mono = 0;
     cfg_midi_any = cfg_closed = dual = 0;
 }
 
-static void dchroma_loaded(int found)
+static void dprism_loaded(int found)
 {
     int i;
     if (!found || save.ver != SAVE_VER || save.order >= 24) {
@@ -132,67 +132,67 @@ static void dchroma_loaded(int found)
             save.preset[i][0] = 0;
     } else {
         for (i = 0; i < 8; i++) {
-            dchroma.knob[i] = save.knob[i] & 127;
-            dchroma.sec[i] = save.sec[i] & 127;
+            dprism.knob[i] = save.knob[i] & 127;
+            dprism.sec[i] = save.sec[i] & 127;
         }
         for (i = 0; i < 4; i++) {
-            dchroma.fx[i] = save.fx[i] < 5 ? save.fx[i] : 0;
-            dchroma.on[i] = save.on[i] & 1;
+            dprism.fx[i] = save.fx[i] < 5 ? save.fx[i] : 0;
+            dprism.on[i] = save.on[i] & 1;
         }
-        dchroma.order = save.order;
-        dchroma.style = save.style < 3 ? save.style : 0;
-        dchroma.croute = save.croute & 1;
-        dchroma.level = save.level & 3;
-        dchroma.bypass = save.bypass & 1;
-        dchroma.trails = save.trails & 1;
-        dchroma.clock = save.clock < 3 ? save.clock : 0;
-        dchroma.tap = save.tap >= 2400 && save.tap <= 48000 ? save.tap : 14400;
+        dprism.order = save.order;
+        dprism.style = save.style < 3 ? save.style : 0;
+        dprism.croute = save.croute & 1;
+        dprism.level = save.level & 3;
+        dprism.bypass = save.bypass & 1;
+        dprism.trails = save.trails & 1;
+        dprism.clock = save.clock < 3 ? save.clock : 0;
+        dprism.tap = save.tap >= 2400 && save.tap <= 48000 ? save.tap : 14400;
         cfg_midi_any = save.cfg & 1;
         cfg_closed = (save.cfg >> 1) & 1;
-        dchroma.source = (save.cfg >> 2) & 1;
-        dchroma.mono = (save.cfg >> 3) & 1;
+        dprism.source = (save.cfg >> 2) & 1;
+        dprism.mono = (save.cfg >> 3) & 1;
         dual = (save.cfg >> 4) & 15;
     }
     ui_inited = 1;
 }
 
-const struct core_projdata dchroma_projdata = { 0x44434852u /* "DCHR" */, sizeof(struct dh_save), &save,
-                                                dchroma_loaded };
+const struct core_projdata dprism_projdata = { 0x44434852u /* "DCHR" */, sizeof(struct dh_save), &save,
+                                                dprism_loaded };
 
 static void keep_save(void)                 /* the pedal into the project's copy (the presets are there) */
 {
     int i;
     save.ver = SAVE_VER;
     for (i = 0; i < 8; i++) {
-        save.knob[i] = dchroma.knob[i];
-        save.sec[i] = dchroma.sec[i];
+        save.knob[i] = dprism.knob[i];
+        save.sec[i] = dprism.sec[i];
     }
     for (i = 0; i < 4; i++) {
-        save.fx[i] = dchroma.fx[i];
-        save.on[i] = dchroma.on[i];
+        save.fx[i] = dprism.fx[i];
+        save.on[i] = dprism.on[i];
     }
-    save.order = dchroma.order;
-    save.style = dchroma.style;
-    save.croute = dchroma.croute;
-    save.level = dchroma.level;
-    save.bypass = dchroma.bypass;
-    save.trails = dchroma.trails;
-    save.clock = dchroma.clock;
-    save.tap = dchroma.tap;
-    save.cfg = (u8)(cfg_midi_any | cfg_closed << 1 | dchroma.source << 2 | dchroma.mono << 3 | dual << 4);
+    save.order = dprism.order;
+    save.style = dprism.style;
+    save.croute = dprism.croute;
+    save.level = dprism.level;
+    save.bypass = dprism.bypass;
+    save.trails = dprism.trails;
+    save.clock = dprism.clock;
+    save.tap = dprism.tap;
+    save.cfg = (u8)(cfg_midi_any | cfg_closed << 1 | dprism.source << 2 | dprism.mono << 3 | dual << 4);
 }
 
 static void preset_save(int n)
 {
     u8 *p = save.preset[n];
     int i;
-    p[0] = (u8)(0x80 | dchroma.order);
-    p[1] = (u8)(dchroma.fx[0] | dchroma.fx[1] << 3);
-    p[2] = (u8)(dchroma.fx[2] | dchroma.fx[3] << 3);
-    p[3] = (u8)(dchroma.on[0] | dchroma.on[1] << 1 | dchroma.on[2] << 2 | dchroma.on[3] << 3 | dchroma.style << 4
-                | dchroma.croute << 6);
+    p[0] = (u8)(0x80 | dprism.order);
+    p[1] = (u8)(dprism.fx[0] | dprism.fx[1] << 3);
+    p[2] = (u8)(dprism.fx[2] | dprism.fx[3] << 3);
+    p[3] = (u8)(dprism.on[0] | dprism.on[1] << 1 | dprism.on[2] << 2 | dprism.on[3] << 3 | dprism.style << 4
+                | dprism.croute << 6);
     for (i = 0; i < 8; i++)
-        p[4 + i] = dchroma.knob[i];
+        p[4 + i] = dprism.knob[i];
 }
 
 static int preset_recall(int n)             /* -> 0 when the slot is empty */
@@ -201,23 +201,23 @@ static int preset_recall(int n)             /* -> 0 when the slot is empty */
     int i;
     if (!(p[0] & 0x80) || (p[0] & 0x7f) >= 24)
         return 0;
-    dchroma.order = p[0] & 0x7f;
-    dchroma.fx[0] = p[1] & 7;
-    dchroma.fx[1] = (p[1] >> 3) & 7;
-    dchroma.fx[2] = p[2] & 7;
-    dchroma.fx[3] = (p[2] >> 3) & 7;
+    dprism.order = p[0] & 0x7f;
+    dprism.fx[0] = p[1] & 7;
+    dprism.fx[1] = (p[1] >> 3) & 7;
+    dprism.fx[2] = p[2] & 7;
+    dprism.fx[3] = (p[2] >> 3) & 7;
     for (i = 0; i < 4; i++) {
-        if (dchroma.fx[i] > 4)
-            dchroma.fx[i] = 0;
-        dchroma.on[i] = (p[3] >> i) & 1;
+        if (dprism.fx[i] > 4)
+            dprism.fx[i] = 0;
+        dprism.on[i] = (p[3] >> i) & 1;
     }
-    dchroma.style = (p[3] >> 4) & 3;
-    if (dchroma.style > 2)
-        dchroma.style = 0;
-    dchroma.croute = (p[3] >> 6) & 1;
+    dprism.style = (p[3] >> 4) & 3;
+    if (dprism.style > 2)
+        dprism.style = 0;
+    dprism.croute = (p[3] >> 6) & 1;
     for (i = 0; i < 8; i++) {
-        dchroma.knob[i] = p[4 + i] & 127;
-        dchroma.gkill[i] = 1;               /* a preset's knobs, not the gestures over the old ones */
+        dprism.knob[i] = p[4 + i] & 127;
+        dprism.gkill[i] = 1;               /* a preset's knobs, not the gestures over the old ones */
     }
     return 1;
 }
@@ -230,30 +230,30 @@ static void message(int kind, int n)
 }
 
 /* ---- opening and closing -------------------------------------------------------------------------- */
-static void dchroma_open(void *brain, void *ev, int track)
+static void dprism_open(void *brain, void *ev, int track)
 {
     (void)brain, (void)ev, (void)track;
     ui_open = 1;
     ui_setup = 0;
     ui_pg = 0;
     ui_func = 0;
-    dchroma.bypass = 0;                     /* opening it steps on it */
-    dchroma.overload = 0;
+    dprism.bypass = 0;                     /* opening it steps on it */
+    dprism.overload = 0;
 }
 
-static void dchroma_close(void)
+static void dprism_close(void)
 {
     ui_open = 0;
-    dchroma.grec = 0;
+    dprism.grec = 0;
     cap_down = 0;
 }
 
-/* The Mod Menu's DIGICHROMA, with its icon: a pedal, eight knobs over four buttons and two footswitches. */
-static const u16 dchroma_icon[16] = {
+/* The Mod Menu's DIGIPRISM, with its icon: a pedal, eight knobs over four buttons and two footswitches. */
+static const u16 dprism_icon[16] = {
     0x0000, 0x7ffe, 0x4002, 0x76da, 0x76da, 0x4002, 0x76da, 0x76da,
     0x4002, 0x524a, 0x4002, 0x5c3a, 0x5c3a, 0x4002, 0x7ffe, 0x0000
 };
-const struct core_menu_item dchroma_menu = { "DIGICHROMA", dchroma_open, CORE_MENU_ICON, dchroma_icon };
+const struct core_menu_item dprism_menu = { "DIGIPRISM", dprism_open, CORE_MENU_ICON, dprism_icon };
 
 /* ---- knobs and keys ------------------------------------------------------------------------------- */
 static void flash(int pg, int i)              /* the control's value in the title bar, a second */
@@ -267,10 +267,10 @@ static void flash(int pg, int i)              /* the control's value in the titl
 /* A primary knob moved, by hand or by MIDI: GESTURE records it, or the move deletes its gesture. */
 static void knob_moved(int i)
 {
-    if (dchroma.grec)
-        dchroma.gtouch[i] = 1;
-    else if (dchroma.gstate[i] != G_NONE)
-        dchroma.gkill[i] = 1;
+    if (dprism.grec)
+        dprism.gtouch[i] = 1;
+    else if (dprism.gstate[i] != G_NONE)
+        dprism.gkill[i] = 1;
 }
 
 static void set_knob(int i, int sec, s32 v)
@@ -278,14 +278,14 @@ static void set_knob(int i, int sec, s32 v)
     if (v < 0) v = 0;
     if (v > 127) v = 127;
     if (sec) {
-        dchroma.sec[i] = (u8)v;
+        dprism.sec[i] = (u8)v;
     } else {
-        dchroma.knob[i] = (u8)v;
+        dprism.knob[i] = (u8)v;
         knob_moved(i);
     }
 }
 
-static int can_insert(void)                   /* the core takes the source DIGITONE (core-dn1 3.3) */
+static int can_insert(void)                   /* the core takes the source DIGITONE (core-dn1 3.4) */
 {
     return (core_audio_caps & CORE_AUDIO_INSERT) != 0;
 }
@@ -304,25 +304,25 @@ static void show_fx(int m)
 
 static void next_fx(int m)                    /* a module's button: its next effect, and it runs */
 {
-    dchroma.fx[m] = (u8)((dchroma.fx[m] + 1) % 5);
-    dchroma.on[m] = 1;
+    dprism.fx[m] = (u8)((dprism.fx[m] + 1) % 5);
+    dprism.on[m] = 1;
     show_fx(m);
 }
 
 static void step_setting(int i, int d)        /* page 3's controls */
 {
     if (i < 4) {
-        dchroma.fx[i] = (u8)((dchroma.fx[i] + 5 + d) % 5);
+        dprism.fx[i] = (u8)((dprism.fx[i] + 5 + d) % 5);
         show_fx(i);
     } else if (i == 4) {
-        dchroma.order = (u8)((dchroma.order + 24 + d) % 24);
+        dprism.order = (u8)((dprism.order + 24 + d) % 24);
     } else if (i == 5) {
-        dchroma.style = (u8)((dchroma.style + 3 + d) % 3);
+        dprism.style = (u8)((dprism.style + 3 + d) % 3);
     } else if (i == 6) {
-        dchroma.croute = (u8)(d > 0);
+        dprism.croute = (u8)(d > 0);
     } else {
-        s32 v = dchroma.level + d;
-        dchroma.level = (u8)(v < 0 ? 0 : v > 3 ? 3 : v);
+        s32 v = dprism.level + d;
+        dprism.level = (u8)(v < 0 ? 0 : v > 3 ? 3 : v);
     }
 }
 
@@ -333,13 +333,13 @@ static void push(int i)                      /* an encoder pushed */
         set_knob(i, pg, pg ? sec_def[i] : knob_def[i]);
         flash(pg, i);
     } else if (i < 4) {
-        dchroma.on[i] = !dchroma.on[i];
+        dprism.on[i] = !dprism.on[i];
     }
 }
 
 static void tap(void)                        /* the TAP footswitch: the mean of the last taps */
 {
-    u32 now = dchroma.blocks, iv = now - tap_last, sum = 0, k;
+    u32 now = dprism.blocks, iv = now - tap_last, sum = 0, k;
     tap_last = now;
     if (iv < 225 || iv > 4500) {             /* 400 .. 20 BPM: a new series */
         tap_n = 0;
@@ -349,35 +349,35 @@ static void tap(void)                        /* the TAP footswitch: the mean of 
     tap_n++;
     for (k = 0; k < (tap_n < 3 ? tap_n : 3); k++)
         sum += tap_iv[k];
-    dchroma.tap = 90000u * 120u * (tap_n < 3 ? tap_n : 3) / sum;    /* 1500 blocks a second: BPM x 120 */
-    dchroma.clock = CL_TAP;
+    dprism.tap = 90000u * 120u * (tap_n < 3 ? tap_n : 3) / sum;    /* 1500 blocks a second: BPM x 120 */
+    dprism.clock = CL_TAP;
 }
 
 static void bypass_key(void)                 /* trig 16 */
 {
-    u32 now = dchroma.blocks;
+    u32 now = dprism.blocks;
     int m;
     if (dual && now - byp_at < 600 && byp_undo) {   /* a double press: everything */
         for (m = 0; m < 4; m++)
             if (byp_undo & (1 << m))
-                dchroma.on[m] = !dchroma.on[m];
+                dprism.on[m] = !dprism.on[m];
         byp_undo = 0;
-        dchroma.bypass = !dchroma.bypass;
-    } else if (dual && !dchroma.bypass) {
+        dprism.bypass = !dprism.bypass;
+    } else if (dual && !dprism.bypass) {
         for (m = 0; m < 4; m++)
             if (dual & (1 << m))
-                dchroma.on[m] = !dchroma.on[m];
+                dprism.on[m] = !dprism.on[m];
         byp_undo = dual;
     } else {
-        dchroma.bypass = !dchroma.bypass;
+        dprism.bypass = !dprism.bypass;
         byp_undo = 0;
     }
-    if (!dchroma.bypass)
-        dchroma.overload = 0;
+    if (!dprism.bypass)
+        dprism.overload = 0;
     byp_at = now;
 }
 
-int dchroma_key(void *brain, void *ev)
+int dprism_key(void *brain, void *ev)
 {
     u32 key = EV_KEY(ev), fl = EV_FLAGS(ev);
     int press = (fl & 1) && !(fl & 8), released = (fl & 0x10) != 0;
@@ -401,10 +401,10 @@ int dchroma_key(void *brain, void *ev)
             t_down[m] = t_held[m] = 0;
         } else if (key == KEY_STEP1 + 14 && cap_down) {
             cap_down = 0;
-            if (dchroma.blocks - cap_at >= 450) {
-                dchroma.ccmd = CC_PLAY;     /* held: the recording plays */
+            if (dprism.blocks - cap_at >= 450) {
+                dprism.ccmd = CC_PLAY;     /* held: the recording plays */
             } else {
-                dchroma.ccmd = CC_STOP;     /* a tap: no recording */
+                dprism.ccmd = CC_STOP;     /* a tap: no recording */
                 if (!cap_was_playing)
                     tap();
             }
@@ -428,16 +428,16 @@ int dchroma_key(void *brain, void *ev)
         int k;
         if (ui_func) {
             for (k = 0; k < 8; k++)
-                dchroma.gkill[k] = 1;
-            dchroma.grec = 0;
+                dprism.gkill[k] = 1;
+            dprism.grec = 0;
         } else {
-            dchroma.grec = !dchroma.grec;
+            dprism.grec = !dprism.grec;
         }
     } else if (key == KEY_STEP1 + 14) {     /* TAP / CAPTURE */
-        cap_was_playing = dchroma.cstate == C_PLAY;
+        cap_was_playing = dprism.cstate == C_PLAY;
         cap_down = 1;
-        cap_at = dchroma.blocks;
-        dchroma.ccmd = CC_REC;              /* from the press: a hold keeps it, a tap drops it */
+        cap_at = dprism.blocks;
+        dprism.ccmd = CC_REC;              /* from the press: a hold keeps it, a tap drops it */
     } else if (key == KEY_STEP1 + 15) {     /* BYPASS */
         bypass_key();
     } else if (key == KEY_YES) {
@@ -446,19 +446,19 @@ int dchroma_key(void *brain, void *ev)
         if (ui_setup)
             ui_setup = 0;
         else
-            dchroma_close();
+            dprism_close();
     } else if (ui_setup && (key == KEY_UP || key == KEY_DOWN)) {
         ui_row = (u8)((ui_row + (key == KEY_UP ? G_COUNT - 1 : 1)) % G_COUNT);
     } else if (ui_setup && (key == KEY_LEFT || key == KEY_RIGHT)) {
         int d = key == KEY_RIGHT ? 1 : -1;
         if (ui_row == G_SOURCE)
-            dchroma.source = can_insert() && !dchroma.source;
+            dprism.source = can_insert() && !dprism.source;
         else if (ui_row == G_INPUT)
-            dchroma.mono = !dchroma.mono;
+            dprism.mono = !dprism.mono;
         else if (ui_row == G_CLOCK)
-            dchroma.clock = (u8)((dchroma.clock + 3 + d) % 3);
+            dprism.clock = (u8)((dprism.clock + 3 + d) % 3);
         else if (ui_row == G_BYPASS)
-            dchroma.trails = !dchroma.trails;
+            dprism.trails = !dprism.trails;
         else if (ui_row == G_DUAL)
             dual = (u8)((dual + 16 + d) % 16);
         else if (ui_row == G_MIDI)
@@ -475,17 +475,17 @@ int dchroma_key(void *brain, void *ev)
 }
 
 /* core-dn1's ev_hold, a track key held on its own: while open, that module's bypass. */
-int dchroma_hold(void *brain, void *ev, int track)
+int dprism_hold(void *brain, void *ev, int track)
 {
     (void)brain, (void)ev;
     if (!ui_open || track < 0 || track > 3)
         return 0;
-    dchroma.on[track] = !dchroma.on[track];
+    dprism.on[track] = !dprism.on[track];
     t_held[track] = 1;
     return 1;
 }
 
-int dchroma_enc(void *brain, void *ev)
+int dprism_enc(void *brain, void *ev)
 {
     u32 e = EV_KEY(ev);
     s32 d;
@@ -503,7 +503,7 @@ int dchroma_enc(void *brain, void *ev)
         return 1;
     pg = page_now();
     if (pg < 2) {
-        set_knob(i, pg, (pg ? dchroma.sec[i] : dchroma.knob[i]) + d);
+        set_knob(i, pg, (pg ? dprism.sec[i] : dprism.knob[i]) + d);
         flash(pg, i);
     } else {
         step_setting(i, d > 0 ? 1 : -1);
@@ -511,14 +511,14 @@ int dchroma_enc(void *brain, void *ev)
     return 1;
 }
 
-/* ---- MIDI: the Chroma Console's CC chart (core-dn1 3.2's ev_midi_cc, the MIDI task) --------------------
- * While the page is open (or always, with SETUP's CC CLOSED on) the CCs below are DigiChroma's when they come
+/* ---- MIDI: its CC chart (core-dn1 3.2's ev_midi_cc, the MIDI task) --------------------
+ * While the page is open (or always, with SETUP's CC CLOSED on) the CCs below are DigiPrism's when they come
  * on the auto channel (or on a track's channel too, with SETUP's MIDI CC: ANY CH): the Digitone does not
  * apply them. Every other CC goes on to the Digitone. */
-static const u8 cc_knob[8] = { K_TILT, K_CAMT, K_RATE, K_MAMT, K_TIME, K_DAMT, K_MIX, K_TAMT };      /* 64-71 */
-static const u8 cc_sec[8] = { S_SENS, S_CVOL, S_MDRIFT, S_MVOL, S_DDRIFT, S_DVOL, S_OUT, S_TVOL };  /* 72-79 */
+static const u8 cc_knob[8] = { K_TILT, K_CAMT, K_RATE, K_MAMT, K_TIME, K_AAMT, K_MIX, K_GAMT };      /* 64-71 */
+static const u8 cc_sec[8] = { S_SENS, S_CVOL, S_MDRIFT, S_MVOL, S_DDRIFT, S_AVOL, S_OUT, S_GVOL };  /* 72-79 */
 
-int dchroma_cc(int track, int cc, int value, int flags)
+int dprism_cc(int track, int cc, int value, int flags)
 {
     int on = value >= 64;
     (void)track;
@@ -528,62 +528,62 @@ int dchroma_cc(int track, int cc, int value, int flags)
         return 0;
     if (cc >= 64 && cc <= 71) {
         int k = cc_knob[cc - 64];
-        dchroma.knob[k] = (u8)value;
+        dprism.knob[k] = (u8)value;
         knob_moved(k);
     } else if (cc >= 72 && cc <= 79) {
-        dchroma.sec[cc_sec[cc - 72]] = (u8)value;
+        dprism.sec[cc_sec[cc - 72]] = (u8)value;
     } else if (cc >= 16 && cc <= 19) {          /* a module's effect: five bands of 22, then off */
         int m = cc - 16;
         if (value >= 110) {
-            dchroma.on[m] = 0;
+            dprism.on[m] = 0;
         } else {
-            dchroma.fx[m] = (u8)(value / 22);
-            dchroma.on[m] = 1;
+            dprism.fx[m] = (u8)(value / 22);
+            dprism.on[m] = 1;
         }
     } else if (cc == 91) {                      /* bypass below 64 */
-        dchroma.bypass = (u8)!on;
+        dprism.bypass = (u8)!on;
         if (on)
-            dchroma.overload = 0;
+            dprism.overload = 0;
     } else if (cc == 92) {                      /* total bypass, dual bypass, total engage */
         int m;
         if (value < 32) {
-            dchroma.bypass = 1;
+            dprism.bypass = 1;
         } else if (value < 64) {
             for (m = 0; m < 4; m++)
                 if (dual & (1 << m))
-                    dchroma.on[m] = 0;
+                    dprism.on[m] = 0;
         } else {
-            dchroma.bypass = 0;
-            dchroma.overload = 0;
+            dprism.bypass = 0;
+            dprism.overload = 0;
             for (m = 0; m < 4; m++)
-                dchroma.on[m] = 1;
+                dprism.on[m] = 1;
         }
     } else if (cc >= 103 && cc <= 106) {        /* a module's bypass */
-        dchroma.on[cc - 103] = (u8)on;
+        dprism.on[cc - 103] = (u8)on;
     } else if (cc == 80) {                      /* GESTURE: record from 64, play below */
-        dchroma.grec = (u8)on;
+        dprism.grec = (u8)on;
     } else if (cc == 81) {                      /* GESTURE: erase */
         int k;
-        dchroma.grec = 0;
+        dprism.grec = 0;
         for (k = 0; k < 8; k++)
-            dchroma.gkill[k] = 1;
+            dprism.gkill[k] = 1;
     } else if (cc == 82) {                      /* CAPTURE: stop/clear, play, record */
         if (value < 44)
-            dchroma.ccmd = CC_STOP;
+            dprism.ccmd = CC_STOP;
         else if (value < 88)
-            dchroma.ccmd = dchroma.cstate == C_REC ? CC_PLAY : CC_NONE;
+            dprism.ccmd = dprism.cstate == C_REC ? CC_PLAY : CC_NONE;
         else
-            dchroma.ccmd = CC_REC;
+            dprism.ccmd = CC_REC;
     } else if (cc == 83) {                      /* CAPTURE route: post below 64 */
-        dchroma.croute = (u8)on;
+        dprism.croute = (u8)on;
     } else if (cc == 84) {                      /* FILTER: LPF, TILT, HPF */
-        dchroma.style = (u8)(value < 44 ? ST_LPF : value < 88 ? ST_TILT : ST_HPF);
+        dprism.style = (u8)(value < 44 ? ST_LPF : value < 88 ? ST_TILT : ST_HPF);
     } else if (cc == 93) {                      /* TAP */
         tap();
     } else if (cc == 94) {                      /* the input level, in four bands */
-        dchroma.level = (u8)(value >> 5);
+        dprism.level = (u8)(value >> 5);
     } else if (cc == 95) {
-        /* the calibration menu: DigiChroma has none (LEVL on page 3 sets the input level), but taken, so the
+        /* the calibration menu: DigiPrism has none (LEVL on page 3 sets the input level), but taken, so the
          * Digitone does not apply it to the active track meanwhile */
     } else {
         return 0;
@@ -597,21 +597,21 @@ static u32 ui_sig, ui_ticks;
 static u32 signature(void)                  /* what the page shows, but the meter, folded into a word */
 {
     u32 h = (u32)(page_now() | ui_setup << 2 | ui_row << 3 | (ui_flash_ticks != 0) << 6 | (ui_msg_ticks != 0) << 7
-                  | (ui_fx_ticks != 0) << 8 | dchroma.order << 9 | dchroma.style << 14 | dchroma.croute << 16
-                  | dchroma.level << 17 | dchroma.bypass << 19 | dchroma.overload << 20 | dchroma.grec << 21
-                  | dchroma.cstate << 22 | dual << 24 | dchroma.clock << 28 | dchroma.trails << 30
-                  | (u32)dchroma.source << 31);
+                  | (ui_fx_ticks != 0) << 8 | dprism.order << 9 | dprism.style << 14 | dprism.croute << 16
+                  | dprism.level << 17 | dprism.bypass << 19 | dprism.overload << 20 | dprism.grec << 21
+                  | dprism.cstate << 22 | dual << 24 | dprism.clock << 28 | dprism.trails << 30
+                  | (u32)dprism.source << 31);
     int k;
     for (k = 0; k < 8; k++)
-        h = h * 31 + dchroma.eff[k] + (dchroma.sec[k] << 8) + (dchroma.gstate[k] << 16);
+        h = h * 31 + dprism.eff[k] + (dprism.sec[k] << 8) + (dprism.gstate[k] << 16);
     for (k = 0; k < 4; k++)
-        h = h * 31 + dchroma.fx[k] + (dchroma.on[k] << 4);
-    h = h * 31 + (dchroma.cstate == C_REC ? dchroma.crec : dchroma.clen) / 48000;
-    h = h * 31 + dchroma.load / 10 + ((u32)fw_tempo << 8) + (cfg_midi_any << 24) + (cfg_closed << 25)
-        + (dchroma.mono << 26);
+        h = h * 31 + dprism.fx[k] + (dprism.on[k] << 4);
+    h = h * 31 + (dprism.cstate == C_REC ? dprism.crec : dprism.clen) / 48000;
+    h = h * 31 + dprism.load / 10 + ((u32)fw_tempo << 8) + (cfg_midi_any << 24) + (cfg_closed << 25)
+        + (dprism.mono << 26);
     return h;
 }
-void dchroma_tick(void *ctrl)
+void dprism_tick(void *ctrl)
 {
     if (!ui_inited) {                       /* no project load reached us */
         defaults();
@@ -629,20 +629,20 @@ void dchroma_tick(void *ctrl)
             *p++ = 0;
         clear_at = (u32)end;
         if (clear_at >= DH_CLEAR_END) {
-            dchroma_dsp_reset();
-            dchroma.active = 1;
+            dprism_dsp_reset();
+            dprism.active = 1;
             ui_ready = 1;
         }
     }
-    if (dchroma.source == SRC_DIGITONE && can_insert()) {   /* an insert: on until BYPASS, open or not */
-        dchroma_owner.flags = CORE_AUDIO_INSERT;
-        dchroma_owner.on = ui_ready && (!dchroma.bypass || dchroma.active);
-    } else {                                /* the inputs: the audio is DigiChroma's while the page is open */
-        dchroma_owner.flags = CORE_AUDIO_MUTE_VOICES;
-        dchroma_owner.on = ui_ready && ui_open;
+    if (dprism.source == SRC_DIGITONE && can_insert()) {   /* an insert: on until BYPASS, open or not */
+        dprism_owner.flags = CORE_AUDIO_INSERT;
+        dprism_owner.on = ui_ready && (!dprism.bypass || dprism.active);
+    } else {                                /* the inputs: the audio is DigiPrism's while the page is open */
+        dprism_owner.flags = CORE_AUDIO_MUTE_VOICES;
+        dprism_owner.on = ui_ready && ui_open;
     }
-    dchroma.meter[0] = (u16)(dchroma.meter[0] - (dchroma.meter[0] >> 3));
-    dchroma.meter[1] = (u16)(dchroma.meter[1] - (dchroma.meter[1] >> 3));
+    dprism.meter[0] = (u16)(dprism.meter[0] - (dprism.meter[0] >> 3));
+    dprism.meter[1] = (u16)(dprism.meter[1] - (dprism.meter[1] >> 3));
     keep_save();
     if (ui_msg_ticks)
         ui_msg_ticks--;
@@ -663,10 +663,10 @@ void dchroma_tick(void *ctrl)
 /* ---- the screen: 128 x 64, y = 0 the bottom row ------------------------------------------------------ */
 static void value_text(void *bmp, const void *font, int x, int y, int i, int sec)
 {
-    int v = sec ? dchroma.sec[i] : dchroma.eff[i];
+    int v = sec ? dprism.sec[i] : dprism.eff[i];
     if (!sec && i == K_TILT) {
         TEXTF(bmp, font, x, y, -1, "%c%d", v >= 64 ? '+' : '-', v >= 64 ? v - 64 : 64 - v);
-    } else if (!sec && i == K_RATE && dchroma.fx[M_MOVE] == FX_PITCH) {
+    } else if (!sec && i == K_RATE && dprism.fx[M_MOVE] == FX_PITCH) {
         int st = ((v - 64) * 12 + (v >= 64 ? 32 : -32)) / 64;
         TEXTF(bmp, font, x, y, -1, "%c%dST", st >= 0 ? '+' : '-', st >= 0 ? st : -st);
     } else if (!sec && i == K_MIX) {
@@ -815,62 +815,62 @@ static void cap_icon(void *bmp, int cx, int cy, int s)       /* CAPTURE's state,
 
 static void title_bar(void *bmp, int pg)
 {
-    int t = (dchroma.clock == CL_TAP ? (int)dchroma.tap : fw_tempo) / 120;
+    int t = (dprism.clock == CL_TAP ? (int)dprism.tap : fw_tempo) / 120;
     TEXTF(bmp, FONT_TTL, t >= 100 ? 1 : 3, 56, -1, "%d", t);   /* the box: the tempo, as the stock's A01 */
     FILLRECT(bmp, 0, 54, 14, 63, -1);
     corners(bmp, 0, 54, 14, 63, 0);
     if (ui_fx_ticks && !ui_setup) {
-        TEXTF(bmp, FONT_TTL, 19, 56, -1, "%s%s", dchroma.on[ui_fx_m] ? "" : "(off) ",
-              fx_name[ui_fx_m][dchroma.fx[ui_fx_m] % 5]);
+        TEXTF(bmp, FONT_TTL, 19, 56, -1, "%s%s", dprism.on[ui_fx_m] ? "" : "(off) ",
+              fx_name[ui_fx_m][dprism.fx[ui_fx_m] % 5]);
     } else if (ui_msg_ticks) {
         TEXTF(bmp, FONT_TTL, 19, 56, -1, "%s P%d", ui_msg_kind == 1 ? "Saved" : ui_msg_kind == 2 ? "Loaded" : "Empty",
               ui_msg_preset);
     } else if (ui_flash_ticks && !ui_setup) {
         if (ui_flash_pg < 2) {
             const char *l = ui_flash_pg ? sec_lbl[ui_flash_i]
-                                        : ui_flash_i < 4 ? knob_lbl[ui_flash_i] : fx_lbl[ui_flash_i - 4][dchroma.fx[ui_flash_i - 4]];
+                                        : ui_flash_i < 4 ? knob_lbl[ui_flash_i] : fx_lbl[ui_flash_i - 4][dprism.fx[ui_flash_i - 4]];
             TEXTF(bmp, FONT_TTL, 19, 56, -1, "%s", l);
             value_text(bmp, FONT_TTL, 19 + text_w(l) + 6, 56, ui_flash_i, ui_flash_pg);
         }
     } else if (ui_setup) {
         TEXTF(bmp, FONT_TTL, 19, 56, -1, "Setup (trig: save)");
-    } else if (dchroma.overload) {
+    } else if (dprism.overload) {
         TEXTF(bmp, FONT_TTL, 19, 56, -1, "CPU full: bypassed");
-    } else if (dchroma.grec) {
+    } else if (dprism.grec) {
         TEXTF(bmp, FONT_TTL, 19, 56, -1, "Gesture: rec");
-    } else if (dchroma.bypass) {
+    } else if (dprism.bypass) {
         TEXTF(bmp, FONT_TTL, 19, 56, -1, "Bypassed (%d/%d)", pg + 1, NPAGE);
     } else {
-        TEXTF(bmp, FONT_TTL, 19, 56, -1, "%s (%d/%d)", pg == 0 ? "Chroma" : pg == 1 ? "Secondary" : "Modules",
+        TEXTF(bmp, FONT_TTL, 19, 56, -1, "%s (%d/%d)", pg == 0 ? "Prism" : pg == 1 ? "Secondary" : "Modules",
               pg + 1, NPAGE);
     }
-    TEXTF(bmp, FONT_TTL, 110, 56, -1, "C%d", dchroma.load / 10);   /* the whole render's share */
+    TEXTF(bmp, FONT_TTL, 110, 56, -1, "C%d", dprism.load / 10);   /* the whole render's share */
     FILLRECT(bmp, 17, 54, 127, 63, -1);
     corners(bmp, 17, 54, 127, 63, 0);
 }
 
 static void left_column(void *bmp)
 {
-    int s = dchroma.cstate, k, l, r, secs, g = 0;
+    int s = dprism.cstate, k, l, r, secs, g = 0;
     rframe(bmp, 0, 27, 14, 50);             /* CAPTURE, as the stock's SYN box */
     cap_icon(bmp, 7, 44, s);
     if (s != C_EMPTY) {
-        secs = (int)((s == C_REC ? dchroma.crec : dchroma.clen) / 48000);
+        secs = (int)((s == C_REC ? dprism.crec : dprism.clen) / 48000);
         TEXTF(bmp, FONT5, secs >= 10 ? 3 : 5, 35, -1, "%d", secs);
     }
     for (k = 0; k < 8; k++)
-        g |= dchroma.gstate[k] != G_NONE;
-    if (g || dchroma.grec)
+        g |= dprism.gstate[k] != G_NONE;
+    if (g || dprism.grec)
         small_text(bmp, 4, 31, "G");
-    if (dchroma.bypass)
+    if (dprism.bypass)
         small_text(bmp, 10, 31, "B");
     for (k = 0; k < 5; k++) {               /* the output's meter, as LEV: L and R */
         FILLRECT(bmp, 0, 7 + 4 * k, 1, 7 + 4 * k, 1);
         FILLRECT(bmp, 13, 7 + 4 * k, 14, 7 + 4 * k, 1);
     }
     rframe(bmp, 4, 7, 10, 23);
-    l = (dchroma.meter[0] * 13) / 32767;
-    r = (dchroma.meter[1] * 13) / 32767;
+    l = (dprism.meter[0] * 13) / 32767;
+    r = (dprism.meter[1] * 13) / 32767;
     if (l)
         FILLRECT(bmp, 6, 9, 6, 8 + l, 1);
     if (r)
@@ -878,12 +878,12 @@ static void left_column(void *bmp)
     label(bmp, 7, -1, "OUT");
 }
 
-static void order_text(char *b)              /* the order as four letters: CMDT */
+static void order_text(char *b)              /* the order as four letters: CMAG */
 {
-    static const char L[4] = { 'C', 'M', 'D', 'T' };
+    static const char L[4] = { 'C', 'M', 'A', 'G' };
     int k;
     for (k = 0; k < 4; k++)
-        b[k] = L[ch_order[dchroma.order % 24][k]];
+        b[k] = L[ch_order[dprism.order % 24][k]];
     b[4] = 0;
 }
 
@@ -892,33 +892,33 @@ static void control(void *bmp, int pg, int i)
     int cx = col_x[i & 3], r = i >> 2, cy = ROW_Y(r), m = i & 3;
     const char *lbl;
     if (pg == 0) {
-        int off = r == 1 ? !dchroma.on[m] : 0;
-        if (r == 0 && i < 3 && !dchroma.on[i])
+        int off = r == 1 ? !dprism.on[m] : 0;
+        if (r == 0 && i < 3 && !dprism.on[i])
             off = 1;
-        lbl = r ? fx_lbl[m][dchroma.fx[m]] : knob_lbl[i];
-        knob(bmp, cx, cy, dchroma.eff[i], i == K_TILT || (i == K_RATE && dchroma.fx[M_MOVE] == FX_PITCH)
-             || (i == K_TIME && dchroma.fx[M_DIFF] == FX_REVERSE), off);
-        if (dchroma.gstate[i] == G_PLAY)    /* a gesture plays it: a dot over the knob */
+        lbl = r ? fx_lbl[m][dprism.fx[m]] : knob_lbl[i];
+        knob(bmp, cx, cy, dprism.eff[i], i == K_TILT || (i == K_RATE && dprism.fx[M_MOVE] == FX_PITCH)
+             || (i == K_TIME && dprism.fx[M_DIFF] == FX_REVERSE), off);
+        if (dprism.gstate[i] == G_PLAY)    /* a gesture plays it: a dot over the knob */
             FILLRECT(bmp, cx - 1, cy + 10, cx + 1, cy + 11, 1);
     } else if (pg == 1) {
         lbl = sec_lbl[i];
-        knob(bmp, cx, cy, dchroma.sec[i], i == S_SENS || i >= S_OUT, 0);
+        knob(bmp, cx, cy, dprism.sec[i], i == S_SENS || i >= S_OUT, 0);
     } else {
         char b[5];
         lbl = pg3_lbl[i];
         if (i < 4) {
-            box(bmp, cx, cy, fx_lbl[i][dchroma.fx[i]], 0);
-            if (!dchroma.on[i])
+            box(bmp, cx, cy, fx_lbl[i][dprism.fx[i]], 0);
+            if (!dprism.on[i])
                 line(bmp, cx - 7, cy - 7, cx + 7, cy + 7);
         } else if (i == 4) {
             order_text(b);
             box(bmp, cx, cy, b, 0);
         } else if (i == 5) {
-            box(bmp, cx, cy, styles[dchroma.style % 3], 0);
+            box(bmp, cx, cy, styles[dprism.style % 3], 0);
         } else if (i == 6) {
-            box(bmp, cx, cy, dchroma.croute ? "PRE" : "POST", 0);
+            box(bmp, cx, cy, dprism.croute ? "PRE" : "POST", 0);
         } else {
-            box(bmp, cx, cy, levels[dchroma.level & 3], 0);
+            box(bmp, cx, cy, levels[dprism.level & 3], 0);
         }
     }
     label(bmp, cx, LBL_Y(r), lbl);
@@ -932,13 +932,13 @@ static void draw_setup(void *bmp)
         int y = 47 - 7 * i;
         TEXTF(bmp, FONT5, 3, y, -1, "%s", cfg_lbl[i]);
         if (i == G_SOURCE) {
-            TEXTF(bmp, FONT5, 76, y, -1, "%s", !can_insert() ? "INPUTS ONLY" : dchroma.source ? "DIGITONE" : "INPUTS");
+            TEXTF(bmp, FONT5, 76, y, -1, "%s", !can_insert() ? "INPUTS ONLY" : dprism.source ? "DIGITONE" : "INPUTS");
         } else if (i == G_INPUT) {
-            TEXTF(bmp, FONT5, 76, y, -1, "%s", dchroma.mono ? "MONO (L)" : "STEREO");
+            TEXTF(bmp, FONT5, 76, y, -1, "%s", dprism.mono ? "MONO (L)" : "STEREO");
         } else if (i == G_CLOCK) {
-            TEXTF(bmp, FONT5, 76, y, -1, "%s", clocks[dchroma.clock % 3]);
+            TEXTF(bmp, FONT5, 76, y, -1, "%s", clocks[dprism.clock % 3]);
         } else if (i == G_BYPASS) {
-            TEXTF(bmp, FONT5, 76, y, -1, "%s", dchroma.trails ? "TRAILS" : "CUT");
+            TEXTF(bmp, FONT5, 76, y, -1, "%s", dprism.trails ? "TRAILS" : "CUT");
         } else if (i == G_DUAL) {
             if (!dual)
                 TEXTF(bmp, FONT5, 76, y, -1, "OFF");
@@ -955,7 +955,7 @@ static void draw_setup(void *bmp)
     }
 }
 
-void dchroma_draw(void *bmp, void *ctrl)
+void dprism_draw(void *bmp, void *ctrl)
 {
     int i, pg = page_now();
     (void)ctrl;
@@ -963,7 +963,7 @@ void dchroma_draw(void *bmp, void *ctrl)
         return;
     FILLRECT(bmp, 0, 0, 127, 63, 0);
     if (!ui_ready) {
-        TEXTF(bmp, FONT5, 30, 30, -1, "DIGICHROMA...");
+        TEXTF(bmp, FONT5, 30, 30, -1, "DIGIPRISM...");
         return;
     }
     title_bar(bmp, pg);

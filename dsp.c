@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-/* DigiChroma's render: core-dn1 calls dchroma_render at interrupt level for every block while it has the
+/* DigiPrism's render: core-dn1 calls dprism_render at interrupt level for every block while it has the
  * output, 32 frames, 667 us. With the source INPUTS it owns the audio (the master stage does not run, the synths
- * are muted): in is the audio inputs. With DIGITONE (core-dn1 3.3) it is an insert (CORE_AUDIO_INSERT): in is
+ * are muted): in is the audio inputs. With DIGITONE (core-dn1 3.4) it is an insert (CORE_AUDIO_INSERT): in is
  * what the master stage made, the synths, the inputs as the mixer has them, chorus, delay and reverb. The chain:
  *   in -> CAPTURE (pre-FX) -> the four modules, in their order -> MIX with the dry -> CAPTURE (post-FX)
  *   -> OUTPUT LEVEL -> a soft clip -> out
@@ -12,7 +12,7 @@
  * the delays and REVERSE are stereo; as an insert, after a render that takes over half of every block, Space
  * runs at half the rate and the delays and REVERSE repeat the sum of both sides. */
 #pragma GCC optimize ("no-tree-loop-distribute-patterns")
-#include "dchroma.h"
+#include "dprism.h"
 #include "tables.h"
 
 #define N       32
@@ -21,10 +21,10 @@
 #endif
 #define TOP     65535                           /* a sample's bound between the modules */
 
-struct dh_state dchroma;
-struct core_audio_owner dchroma_owner = { 0, dchroma_render, CORE_AUDIO_MUTE_VOICES };   /* the UI sets flags */
+struct dh_state dprism;
+struct core_audio_owner dprism_owner = { 0, dprism_render, CORE_AUDIO_MUTE_VOICES };   /* the UI sets flags */
 
-/* The modules' orders: C(haracter) M(ovement) D(iffusion) T(exture); 0 is the Chroma Console's own. */
+/* The modules' orders: 0 Color, 1 Motion, 2 Ambience, 3 Grit; order 0 is the default. */
 const u8 ch_order[24][4] = {
     {0, 1, 2, 3}, {0, 1, 3, 2}, {0, 2, 1, 3}, {0, 2, 3, 1}, {0, 3, 1, 2}, {0, 3, 2, 1},
     {1, 0, 2, 3}, {1, 0, 3, 2}, {1, 2, 0, 3}, {1, 2, 3, 0}, {1, 3, 0, 2}, {1, 3, 2, 0},
@@ -106,13 +106,13 @@ static int drop_x;                              /* the trails: the chain gets si
 
 static const s16 cal_gain[4] = { 16345, 8173, 4096, 2053 };     /* LOW +12 dB .. VERY HIGH -6 dB */
 
-u32 dchroma_tempo(void)
+u32 dprism_tempo(void)
 {
     u32 t;
-    if (dchroma.clock == CL_TEMPO)
+    if (dprism.clock == CL_TEMPO)
         t = (u32)fw_tempo;
-    else if (dchroma.clock == CL_TAP)
-        t = dchroma.tap;
+    else if (dprism.clock == CL_TAP)
+        t = dprism.tap;
     else
         return 0;
     return t < 2400 || t > 48000 ? 0 : t;       /* 20-400 BPM */
@@ -129,30 +129,30 @@ static void gestures_block(u32 tempo)
     if (++gtick >= 16) {
         gtick = 0;
         for (k = 0; k < 8; k++) {
-            u8 st = dchroma.gstate[k];
-            if (dchroma.gkill[k]) {
-                dchroma.gkill[k] = 0;
+            u8 st = dprism.gstate[k];
+            if (dprism.gkill[k]) {
+                dprism.gkill[k] = 0;
                 st = G_NONE;
             }
-            if (dchroma.grec && dchroma.gtouch[k]) {
-                dchroma.gtouch[k] = 0;
+            if (dprism.grec && dprism.gtouch[k]) {
+                dprism.gtouch[k] = 0;
                 st = G_REC;
                 glen[k] = 0;
                 gtempo[k] = tempo;
             }
             if (st == G_REC) {
-                if (!dchroma.grec || glen[k] >= DH_GEST_N) {
+                if (!dprism.grec || glen[k] >= DH_GEST_N) {
                     st = glen[k] >= 2 ? G_PLAY : G_NONE;
                     gpos[k] = 0;
                 } else {
-                    G[k * DH_GEST_N + glen[k]++] = dchroma.knob[k];
+                    G[k * DH_GEST_N + glen[k]++] = dprism.knob[k];
                 }
             }
-            dchroma.gstate[k] = st;
+            dprism.gstate[k] = st;
         }
     }
     for (k = 0; k < 8; k++) {
-        if (dchroma.gstate[k] == G_PLAY) {
+        if (dprism.gstate[k] == G_PLAY) {
             const u8 *g = G + k * DH_GEST_N;
             u32 inc = 4096, L = glen[k] << 16, i, f, a, b;
             if (tempo && gtempo[k])
@@ -166,9 +166,9 @@ static void gestures_block(u32 tempo)
             b = g[i + 1 < glen[k] ? i + 1 : 0];
             ek[k] = (s32)(a << 8) + (((s32)b - (s32)a) * (s32)f);
         } else {
-            ek[k] = dchroma.knob[k] << 8;
+            ek[k] = dprism.knob[k] << 8;
         }
-        dchroma.eff[k] = (u8)(ek[k] >> 8);
+        dprism.eff[k] = (u8)(ek[k] >> 8);
     }
 }
 
@@ -177,9 +177,9 @@ static void knobs_block(void)
     int k;
     for (k = 0; k < 8; k++) {
         sk[k] += (ek[k] - sk[k]) >> 2;
-        ss[k] += ((dchroma.sec[k] << 8) - ss[k]) >> 2;
+        ss[k] += ((dprism.sec[k] << 8) - ss[k]) >> 2;
     }
-    gin = (cal_gain[dchroma.level & 3] * exp2_q12((ss[S_SENS] - 16384) >> 5)) >> 12;   /* SENS: +-12 dB */
+    gin = (cal_gain[dprism.level & 3] * exp2_q12((ss[S_SENS] - 16384) >> 5)) >> 12;   /* SENS: +-12 dB */
 }
 
 /* A synced time: the knob picks one of n subdivisions, in quarter notes x 24. */
@@ -217,10 +217,10 @@ static s32 rwalk_step(struct rwalk *r, u32 frames)  /* a new random target every
     return r->rs;
 }
 
-/* ---- CHARACTER ------------------------------------------------------------------------------------ */
+/* ---- COLOR ------------------------------------------------------------------------------------ */
 static s32 c_t0, c_t1, c_p0, c_p1, c_h0, c_h1, c_d0, c_d1, c_l0, c_l1, c_i0, c_i1;
-static s32 c_env, c_g = 4096;                   /* SWEETEN's compressor */
-static s32 h_l0, h_l1, h_b0, h_b1, h_env, h_fi; /* HOWL */
+static s32 c_env, c_g = 4096;                   /* WARMTH's compressor */
+static s32 h_l0, h_l1, h_b0, h_b1, h_env, h_fi; /* WAIL */
 static s32 sw_env, sw_g, sw_arm = 1;            /* SWELL: its follower, gain (Q23), armed */
 
 static void tilt_eq(s32 *w, s32 kq)             /* TILT: +-9 dB shelves about 650 Hz; flat in the middle */
@@ -241,7 +241,7 @@ static void m_char(s32 *w)
 {
     s32 tilt = sk[K_TILT], amt = sk[K_CAMT];
     int i;
-    switch (dchroma.fx[M_CHAR]) {
+    switch (dprism.fx[M_CHAR]) {
     case FX_DRIVE: {                            /* tube-like: TILT before the drive, and its tone after */
         s32 G = (kt32(ch_drive, amt) * gin) >> 12, cap = 33554432 / G, mk = kt(ch_drive_mk, amt);
         s32 pa = ch_op[185 + ((tilt * 51) >> 15)];                  /* 3 .. 12 kHz */
@@ -261,7 +261,7 @@ static void m_char(s32 *w)
         c_d1 = d1 + (((s1 >> 5) - d1) >> 4);
         break;
     }
-    case FX_SWEETEN: {                          /* a preamp: a smile EQ, compression, gentle saturation */
+    case FX_WARMTH: {                          /* a preamp: a smile EQ, compression, gentle saturation */
         s32 gb = (amt * 1434) >> 15, gp = (amt * 1843) >> 15, thr = 8000 * 4096 / gin, pk = 0, g0 = c_g, g1;
         s32 drive = 256 + ((amt * 512) >> 15), mk = 4096 * 256 / drive, al = ch_op[74], ah = ch_op[185];
         s32 l0 = c_l0, l1 = c_l1, i0 = c_i0, i1 = c_i1;
@@ -313,7 +313,7 @@ static void m_char(s32 *w)
         c_h0 = h0, c_h1 = h1, c_d0 = d0, c_d1 = d1, c_p0 = p0, c_p1 = p1;
         break;
     }
-    case FX_HOWL: {                             /* a fuzz into a resonant filter; the envelope opens it */
+    case FX_WAIL: {                             /* a fuzz into a resonant filter; the envelope opens it */
         s32 G = (((kt32(ch_drive, amt) * 3) >> 1) * (gin >> 4)) >> 8, cap = 33554432 / (G > 256 ? G : 256), pk = 0, f, q;
         s32 base = 30 + ((tilt * 140) >> 15), depth = (tilt * 110) >> 15, fi;
         s32 l0 = h_l0, l1 = h_l1, b0 = h_b0, b1 = h_b1;
@@ -369,8 +369,8 @@ static void m_char(s32 *w)
     gain(w, kt(ch_vol, ss[S_CVOL]));
 }
 
-/* ---- MOVEMENT ------------------------------------------------------------------------------------- */
-static u32 mw;                                  /* Movement's line: the next frame written */
+/* ---- MOTION ------------------------------------------------------------------------------------- */
+static u32 mw;                                  /* Motion's line: the next frame written */
 static u32 m_ph;                                /* the LFO */
 static struct rwalk mrw, drw;
 static u32 m_rcnt;
@@ -386,7 +386,7 @@ static void m_move(s32 *w)
     s16 *M = DH_MOVE;
     s32 rate = sk[K_RATE], amt = sk[K_MAMT], drift = ss[S_MDRIFT];
     u32 msk = DH_MOVE_FR - 1, w0 = mw;
-    int i, fx = dchroma.fx[M_MOVE];
+    int i, fx = dprism.fx[M_MOVE];
     if (fx != FX_TREMOLO && fx != FX_PHASER) {  /* the line first: every read is at least a frame back */
         for (i = 0; i < N; i++) {
             u32 p = 2 * ((w0 + i) & msk);
@@ -540,17 +540,17 @@ static void m_move(s32 *w)
     gain(w, kt(ch_vol, ss[S_MVOL]));
 }
 
-/* ---- DIFFUSION ------------------------------------------------------------------------------------ */
-static u32 dw;                                  /* Diffusion's line: the next frame written */
+/* ---- AMBIENCE ------------------------------------------------------------------------------------ */
+static u32 dw;                                  /* Ambience's line: the next frame written */
 static s32 dl_cur;                              /* the delay, frames Q12, slewed to its target */
 static s32 dl_l0, dl_h0, dl_l1, dl_h1, dl_drop = 32767, dl_m, dl_mr;
 static u32 dl_ph, dl_ph2;
-static u32 cl_skip, cl_t, cl_len, cl_start, cl_cnt;     /* COLLAGE's double-speed loops */
+static u32 cl_skip, cl_t, cl_len, cl_start, cl_cnt;     /* SCATTER's double-speed loops */
 static u32 rv_age[4];                           /* REVERSE's heads (two a side): frames into their windows */
 static int d_fx = -1;                           /* the effect the delay's time belongs to */
 
 /* Space: allpasses, then a feedback delay network with damping; its size, feedback, damping and pre-delay
- * blended across five rooms by TIME (a chamber .. a cloud). With the source INPUTS DigiChroma has the CPU
+ * blended across five rooms by TIME (a chamber .. a cloud). With the source INPUTS DigiPrism has the CPU
  * to itself and Space is full: each side through four allpasses into four of eight lines, at 48 kHz, DRIFT
  * moving four of them. As an insert it is lean: the sum through four allpasses into four lines at half the
  * rate (24 kHz, from the average of each two frames, ramped back up). */
@@ -709,9 +709,9 @@ static void space_full(s32 *w, s32 time, s32 amt, s32 drift, s32 wetv)
 static void m_diff(s32 *w)
 {
     s16 *D = DH_DIFF;
-    s32 time = sk[K_TIME], amt = sk[K_DAMT], drift = ss[S_DDRIFT], wetv = kt(ch_vol, ss[S_DVOL]);
+    s32 time = sk[K_TIME], amt = sk[K_AAMT], drift = ss[S_DDRIFT], wetv = kt(ch_vol, ss[S_AVOL]);
     u32 msk = DH_DIFF_FR - 1;
-    int i, fx = dchroma.fx[M_DIFF];
+    int i, fx = dprism.fx[M_DIFF];
     if (fx == FX_SPACE) {
         d_fx = fx;
         if (hq)
@@ -775,12 +775,12 @@ static void m_diff(s32 *w)
         rv_age[0] = a0, rv_age[1] = a1;
         return;
     }
-    {                                           /* CASCADE, REELS, COLLAGE: a delay with feedback */
+    {                                           /* ECHOES, TAPE, SCATTER: a delay with feedback */
         s32 T, fb, step, la, ha, mdep, wet = (wetv * 3482) >> 12, crush = 0, noise = 0, m1, ms, r1, rs;
         s32 l0 = dl_l0, h0 = dl_h0, cur = dl_cur, drop = dl_drop;
         u32 inc1, inc2;
         const s16 *sat = sh_soft;
-        if (fx == FX_COLLAGE) {
+        if (fx == FX_SCATTER) {
             T = qfr ? (s32)sync_frames(time, col_div, 6) : kt32(ch_ctime, time);
             fb = (amt * 16712) >> 15;           /* to 1.02: it oscillates, softly clipped */
             step = 4096;                        /* the head moves at up to 2x or stops: bends */
@@ -791,7 +791,7 @@ static void m_diff(s32 *w)
             inc2 = 0;
         } else {
             T = qfr ? (s32)sync_frames(time, dly_div, 7) : kt32(ch_dtime, time);
-            if (fx == FX_CASCADE) {             /* bucket-brigade: dark, slow to change */
+            if (fx == FX_ECHOES) {             /* bucket-brigade: dark, slow to change */
                 fb = (amt * 18000) >> 15;
                 step = 2048;
                 la = ch_op[180 - ((drift * 30) >> 15)];
@@ -801,7 +801,7 @@ static void m_diff(s32 *w)
                 inc2 = 0;
                 crush = (drift * 6) >> 15;
                 noise = (drift * 40) >> 15;
-            } else {                            /* REELS: tape, brighter, wow and flutter */
+            } else {                            /* TAPE: tape, brighter, wow and flutter */
                 fb = (amt * 17700) >> 15;
                 step = 3072;
                 la = ch_op[211 - ((drift * 25) >> 15)];
@@ -822,7 +822,7 @@ static void m_diff(s32 *w)
             cur = T << 12;
             cl_skip = 0;
         }
-        if (fx == FX_COLLAGE && drift) {        /* DRIFT: now and then a loop at double speed */
+        if (fx == FX_SCATTER && drift) {        /* DRIFT: now and then a loop at double speed */
             cl_cnt += N;
             if (!cl_skip && cl_cnt >= (u32)T) {
                 cl_cnt = 0;
@@ -834,7 +834,7 @@ static void m_diff(s32 *w)
                 }
             }
         }
-        if (fx == FX_REELS && drift > 8192) {   /* worn tape: dropouts */
+        if (fx == FX_TAPE && drift > 8192) {   /* worn tape: dropouts */
             if (drop >= 32767 && rnd_n(65535) < (u32)(drift >> 9))
                 drop = 32767 - (s32)rnd_n(24000);
         }
@@ -941,8 +941,8 @@ static void m_diff(s32 *w)
     }
 }
 
-/* ---- TEXTURE -------------------------------------------------------------------------------------- */
-static u32 tw;                                  /* Texture's line: the next frame written */
+/* ---- GRIT -------------------------------------------------------------------------------------- */
+static u32 tw;                                  /* Grit's line: the next frame written */
 static s32 t_a0, t_a1, t_b0, t_b1, t_c0;        /* filters */
 static s32 sq_env;
 static u32 t_ph, t_ph2, t_cnt, t_ev;
@@ -973,17 +973,17 @@ static void filt(s32 *w, s32 idx, int hp)       /* two one-poles: 12 dB an octav
 static void m_tex(s32 *w)
 {
     s16 *T = DH_TEX;
-    s32 amt = sk[K_TAMT];
+    s32 amt = sk[K_GAMT];
     u32 msk = DH_TEX_FR - 1;
     int i;
-    switch (dchroma.fx[M_TEX]) {
+    switch (dprism.fx[M_TEX]) {
     case FX_FILTER: {                           /* TILT: low-pass left, high-pass right; or LPF, HPF */
         s32 k = amt, idx;
-        if (dchroma.style == ST_LPF) {
+        if (dprism.style == ST_LPF) {
             idx = (74 << 8) + ((k * 181) >> 7);
             if (idx < (250 << 8))
                 filt(w, idx, 0);
-        } else if (dchroma.style == ST_HPF) {
+        } else if (dprism.style == ST_HPF) {
             idx = (k * 196) >> 7;
             if (idx > (5 << 8))
                 filt(w, idx, 1);
@@ -998,7 +998,7 @@ static void m_tex(s32 *w)
         }
         break;
     }
-    case FX_SQUASH: {                           /* heavy compression; it overdrives near the top */
+    case FX_COMP: {                           /* heavy compression; it overdrives near the top */
         s32 thr = (16384 - ((amt * 14384) >> 15)) * 4096 / gin, ratio = 3 + ((amt * 17) >> 15);
         s32 mk = 4096 + ((amt * 4096) >> 15), od = amt > 24384 ? 256 + ((amt - 24384) >> 4) : 0, env = sq_env;
         if (thr < 500)
@@ -1020,7 +1020,7 @@ static void m_tex(s32 *w)
         sq_env = env;
         break;
     }
-    case FX_CASSETTE: {                         /* saturation, a narrowing band, wow, flutter, hiss, dropouts */
+    case FX_LOFI: {                         /* saturation, a narrowing band, wow, flutter, hiss, dropouts */
         s32 u = amt, u2 = (u >> 7) * (u >> 7) >> 1, drive = 256 + ((u * 640) >> 15);
         s32 la = ch_op[247 - ((u * 46) >> 15)], ha = ch_op[15 + ((u * 59) >> 15)];
         s32 wow = (4 << 12) + u2 * 8, flut = 1600 + (u2 >> 2), warble = u > 19660 ? (u - 19660) * 4 : 0;
@@ -1072,7 +1072,7 @@ static void m_tex(s32 *w)
         t_a0 = a0, t_a1 = a1, t_b0 = b0, t_b1 = b1;
         break;
     }
-    case FX_BROKEN: {                           /* the motor slows and catches: pitch drops, AM, FM */
+    case FX_GLITCH: {                           /* the motor slows and catches: pitch drops, AM, FM */
         s32 u = amt, depth = 4915 + ((u * 19660) >> 15), am = (u * 11468) >> 15, s = 0, sx, g, gs;
         u32 d, d1;
         if (br_len) {                           /* a drop: the speed sinks and comes back (per block) */
@@ -1133,7 +1133,7 @@ static void m_tex(s32 *w)
             br_extra = 0, t_d = (s32)(64 << 12);
         break;
     }
-    default: {                                  /* INTERFERENCE: static, fading, buzz, then glitches */
+    default: {                                  /* STATIC: static, fading, buzz, then glitches */
         s32 u = amt, noise = (u * 300) >> 15, c0 = t_c0;
         s32 fade = u > 8192 ? ((u - 8192) * 30) >> 5 : 0, buzz = u > 14745 ? (u - 14745) >> 2 : 0;
         int glitch = u > 19660, crack = -1;
@@ -1220,7 +1220,7 @@ static void m_tex(s32 *w)
         break;
     }
     }
-    gain(w, kt(ch_vol, ss[S_TVOL]));
+    gain(w, kt(ch_vol, ss[S_GVOL]));
 }
 
 /* ---- CAPTURE: hold to record, plays on release; a short one plays as a sustained pad -------------- */
@@ -1230,23 +1230,23 @@ static int cap_zero = 1;                        /* cap holds silence */
 
 static void capture_block(void)
 {
-    int c = dchroma.ccmd;
+    int c = dprism.ccmd;
     if (c) {
-        dchroma.ccmd = CC_NONE;
+        dprism.ccmd = CC_NONE;
         if (c == CC_REC) {
-            dchroma.crec = 0;
-            dchroma.cstate = C_REC;
-        } else if (c == CC_PLAY && dchroma.cstate == C_REC) {
-            if (dchroma.crec < 2400) {
-                dchroma.cstate = C_EMPTY;
+            dprism.crec = 0;
+            dprism.cstate = C_REC;
+        } else if (c == CC_PLAY && dprism.cstate == C_REC) {
+            if (dprism.crec < 2400) {
+                dprism.cstate = C_EMPTY;
             } else {
-                dchroma.clen = dchroma.crec;
+                dprism.clen = dprism.crec;
                 cpos = 0;
-                dchroma.cstate = C_PLAY;
+                dprism.cstate = C_PLAY;
             }
         } else if (c == CC_STOP) {
-            dchroma.cstate = C_EMPTY;
-            dchroma.clen = 0;
+            dprism.cstate = C_EMPTY;
+            dprism.clen = 0;
         }
     }
 }
@@ -1254,9 +1254,9 @@ static void capture_block(void)
 static void capture_play(void)
 {
     const s16 *A = DH_CAP;
-    u32 L = dchroma.clen, p = cpos;
+    u32 L = dprism.clen, p = cpos;
     int i;
-    if (dchroma.cstate != C_PLAY || !L) {
+    if (dprism.cstate != C_PLAY || !L) {
         if (!cap_zero)
             for (i = 0; i < 2 * N; i++)
                 cap[i] = 0;
@@ -1293,19 +1293,19 @@ static void capture_play(void)
 static void capture_write(const s32 *src)
 {
     s16 *A = DH_CAP;
-    u32 r = dchroma.crec;
+    u32 r = dprism.crec;
     int i;
-    if (dchroma.cstate != C_REC)
+    if (dprism.cstate != C_REC)
         return;
     for (i = 0; i < N && r < DH_CAP_FR; i++, r++) {
         A[2 * r] = (s16)sat16(src[2 * i] >> 1);
         A[2 * r + 1] = (s16)sat16(src[2 * i + 1] >> 1);
     }
-    dchroma.crec = r;
+    dprism.crec = r;
     if (r >= DH_CAP_FR) {
-        dchroma.clen = r;
+        dprism.clen = r;
         cpos = 0;
-        dchroma.cstate = C_PLAY;
+        dprism.cstate = C_PLAY;
     }
 }
 
@@ -1315,23 +1315,23 @@ static void capture_write(const s32 *src)
  * at once (no trails), and says so. The emulator has no DMA timer 0: there the guard sees nothing. */
 static u32 r_in, r_prev, r_over;
 
-void dchroma_rin(void)
+void dprism_rin(void)
 {
     r_prev = r_in;
     r_in = DTCN0;
 }
 
-void dchroma_rout(void)
+void dprism_rout(void)
 {
     u32 per = r_in - r_prev, busy = DTCN0 - r_in, l;
     if (per < 1000 || per > 400000)
         return;
     l = busy * 1000u / per;
-    dchroma.load = (u16)l;
-    if (l > 930 && dchroma_owner.on && !dchroma.bypass) {
+    dprism.load = (u16)l;
+    if (l > 930 && dprism_owner.on && !dprism.bypass) {
         if (++r_over >= 300) {
-            dchroma.overload = 1;
-            dchroma.bypass = 1;
+            dprism.overload = 1;
+            dprism.bypass = 1;
             r_over = 0;
         }
     } else if (r_over) {
@@ -1342,7 +1342,7 @@ void dchroma_rout(void)
 /* ---- the block ------------------------------------------------------------------------------------ */
 static u32 t_prev, quiet;
 
-void dchroma_dsp_reset(void)
+void dprism_dsp_reset(void)
 {
     int k;
     mw = dw = tw = 0;
@@ -1366,23 +1366,23 @@ void dchroma_dsp_reset(void)
     dl_l0 = dl_h0 = dl_l1 = dl_h1 = 0;
     t_a0 = t_a1 = t_b0 = t_b1 = t_c0 = 0;
     for (k = 0; k < 8; k++) {
-        ek[k] = sk[k] = dchroma.knob[k] << 8;
-        ss[k] = dchroma.sec[k] << 8;
-        dchroma.gstate[k] = G_NONE;
+        ek[k] = sk[k] = dprism.knob[k] << 8;
+        ss[k] = dprism.sec[k] << 8;
+        dprism.gstate[k] = G_NONE;
     }
-    dchroma.cstate = C_EMPTY;
-    dchroma.clen = 0;
+    dprism.cstate = C_EMPTY;
+    dprism.clen = 0;
 }
 
-void dchroma_render(int32_t *out, const int32_t *in)
+void dprism_render(int32_t *out, const int32_t *in)
 {
     static s32 x[2 * N], w[2 * N];
-    u32 t0 = DTCN0, tempo = dchroma_tempo();
+    u32 t0 = DTCN0, tempo = dprism_tempo();
     s32 md, mw_, ov, pk0 = 0, pk1 = 0, tail = 0;
-    int i, k, pre = dchroma.croute, byp = dchroma.bypass;
+    int i, k, pre = dprism.croute, byp = dprism.bypass;
 
-    dchroma.blocks++;
-    hq = !(dchroma_owner.flags & CORE_AUDIO_INSERT);
+    dprism.blocks++;
+    hq = !(dprism_owner.flags & CORE_AUDIO_INSERT);
     qfr = tempo ? 345600000u / tempo : 0;
     gestures_block(tempo);
     knobs_block();
@@ -1401,7 +1401,7 @@ void dchroma_render(int32_t *out, const int32_t *in)
         for (i = 0; i < 2 * N; i++)
             w[i] = x[i] = in[i] >> 16;
     }
-    if (dchroma.mono)                           /* a mono source on input L: on both sides */
+    if (dprism.mono)                           /* a mono source on input L: on both sides */
         for (i = 0; i < 2 * N; i += 2) {
             x[i + 1] = x[i];
             w[i + 1] = w[i];
@@ -1411,8 +1411,8 @@ void dchroma_render(int32_t *out, const int32_t *in)
         if (pre)
             capture_write(x);
         for (k = 0; k < 4; k++) {
-            int m = ch_order[dchroma.order % 24][k];
-            if (!dchroma.on[m])
+            int m = ch_order[dprism.order % 24][k];
+            if (!dprism.on[m])
                 continue;
             switch (m) {
             case M_CHAR: m_char(w); break;
@@ -1421,8 +1421,8 @@ void dchroma_render(int32_t *out, const int32_t *in)
             default: m_tex(w); break;
             }
         }
-    } else if (dchroma.on[M_DIFF] && dchroma.trails && !dchroma.overload) {
-        m_diff(w);                              /* the trails: Diffusion's tail, on silence */
+    } else if (dprism.on[M_DIFF] && dprism.trails && !dprism.overload) {
+        m_diff(w);                              /* the trails: Ambience's tail, on silence */
         for (i = 0; i < 2 * N; i++)
             if (absv(w[i]) > tail)
                 tail = absv(w[i]);
@@ -1440,7 +1440,7 @@ void dchroma_render(int32_t *out, const int32_t *in)
             out[i + 1] = y1 << 16;
         }
     } else {
-        int rec = !pre && dchroma.cstate == C_REC, play = !pre && !cap_zero;
+        int rec = !pre && dprism.cstate == C_REC, play = !pre && !cap_zero;
         mw_ = (sk[K_MIX] * 129) >> 10;
         md = 4096 - mw_;
         if (!rec && !play && !md && ov > 4092 && ov < 4100) {
@@ -1471,24 +1471,24 @@ void dchroma_render(int32_t *out, const int32_t *in)
             if (y1 > pk1) pk1 = y1;
         }
     }
-    if (pk0 > dchroma.meter[0])
-        dchroma.meter[0] = (u16)pk0;
-    if (pk1 > dchroma.meter[1])
-        dchroma.meter[1] = (u16)pk1;
+    if (pk0 > dprism.meter[0])
+        dprism.meter[0] = (u16)pk0;
+    if (pk1 > dprism.meter[1])
+        dprism.meter[1] = (u16)pk1;
 
     /* bypassed: once the tail has been quiet half a second, the render has nothing more to add */
     if (!byp)
         quiet = 0;
-    else if (tail > 16 || !dchroma.trails || dchroma.overload)
-        quiet = dchroma.trails && !dchroma.overload ? 0 : 750;
+    else if (tail > 16 || !dprism.trails || dprism.overload)
+        quiet = dprism.trails && !dprism.overload ? 0 : 750;
     else
         quiet++;
-    dchroma.active = (u8)(!byp || quiet < 750);
+    dprism.active = (u8)(!byp || quiet < 750);
 
     {                                           /* the CPU guard's measure: this render's share of a block */
         u32 t1 = DTCN0, per = t0 - t_prev;
         if (per)
-            dchroma.cpu = (u16)((t1 - t0) * 1000u / per);
+            dprism.cpu = (u16)((t1 - t0) * 1000u / per);
         t_prev = t0;
     }
 }

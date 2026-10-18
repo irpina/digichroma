@@ -1,4 +1,4 @@
-"""DigiChroma's constant tables (tables.h): waveshapers, sine, exp2, filter coefficients, knob curves.
+"""DigiPrism's constant tables (tables.h): waveshapers, sine, exp2, filter coefficients, knob curves.
 python3 gentables.py > tables.h"""
 import math
 
@@ -52,7 +52,7 @@ arr('int16_t', 'ch_op', [int(round(16384 * (1 - math.exp(-2 * math.pi * op_f(i) 
 arr('int16_t', 'ch_ap', [clip16(32767 * (math.tan(math.pi * 60.0 * 100.0 ** (i / 255.0) / FS) - 1)
                                 / (math.tan(math.pi * 60.0 * 100.0 ** (i / 255.0) / FS) + 1)) for i in range(256)], 16)
 
-# Howl: the Chamberlin SVF's f = 2 sin(pi fc / fs), Q14, 60 Hz .. 7 kHz over 256 log steps.
+# Wail: the Chamberlin SVF's f = 2 sin(pi fc / fs), Q14, 60 Hz .. 7 kHz over 256 log steps.
 arr('int16_t', 'ch_svf', [int(round(16384 * 2 * math.sin(math.pi * 60.0 * (7000 / 60.0) ** (i / 255.0) / FS)))
                           for i in range(256)], 16)
 
@@ -75,9 +75,9 @@ arr('int16_t', 'ch_mix_dry', knob(lambda u: int(round(4096 * math.cos(math.pi / 
 arr('int16_t', 'ch_mix_wet', knob(lambda u: int(round(4096 * math.sin(math.pi / 2 * u)))), 16)
 # Rates in milli-hertz, exponential: 0.05 .. 16 Hz.
 arr('int32_t', 'ch_rate', knob(lambda u: int(round(1000 * 0.05 * 320.0 ** u))), 12)
-# Delay times in frames, exponential: 30 ms .. 700 ms (Cascade, Reels).
+# Delay times in frames, exponential: 30 ms .. 700 ms (Echoes, Tape).
 arr('int32_t', 'ch_dtime', knob(lambda u: int(round(FS * 0.030 * (0.700 / 0.030) ** u))), 12)
-# Collage's loop: 40 ms .. 2.5 s.
+# Scatter's loop: 40 ms .. 2.5 s.
 arr('int32_t', 'ch_ctime', knob(lambda u: int(round(FS * 0.040 * (2.5 / 0.040) ** u))), 12)
 # Doubler: 6 ms .. 110 ms.
 arr('int32_t', 'ch_dbl', knob(lambda u: int(round(FS * 0.006 * (0.110 / 0.006) ** u))), 12)
@@ -88,5 +88,5 @@ arr('int16_t', 'ch_drive_mk', knob(lambda u: int(round(4096 * 0.16 / math.tanh(0
 arr('int32_t', 'ch_fuzz', knob(lambda u: int(round(256 * 3.0 * 100.0 ** u))), 12)
 
 print('/* SPDX-License-Identifier: GPL-2.0-or-later */')
-print('/* DigiChroma\'s constant tables, from gentables.py: do not edit. */')
+print('/* DigiPrism\'s constant tables, from gentables.py: do not edit. */')
 print('\n'.join(out))

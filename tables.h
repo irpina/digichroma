@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later */
-/* DigiChroma's constant tables, from gentables.py: do not edit. */
+/* DigiPrism's constant tables, from gentables.py: do not edit. */
 static const int16_t sh_tube[1025] = {
     -32742, -32742, -32741, -32741, -32740, -32740, -32740, -32739, -32739, -32738, -32738, -32737, -32737, -32736, -32736, -32735,
     -32735, -32734, -32734, -32733, -32733, -32732, -32732, -32731, -32731, -32730, -32730, -32729, -32728, -32728, -32727, -32727,
