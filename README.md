@@ -5,17 +5,16 @@ four modules in a chain you can reorder, each with five effects, Color
 (DRIVE, WARMTH, FUZZ, WAIL, SWELL), Motion (DOUBLER, VIBRATO, PHASER,
 TREMOLO, PITCH), Ambience (ECHOES, TAPE, SPACE, SCATTER, REVERSE) and
 Grit (FILTER, COMP, LO-FI, GLITCH, STATIC), with GESTURE (knob
-recordings), CAPTURE (a 30-second looper and sustainer), presets and MIDI
-CCs. DigiPrism is an elekloader mod for core-dn1 3.2.
+recordings), CAPTURE (a 30-second looper and sustainer) and MIDI CCs.
+DigiPrism is an elekloader mod on fxkit (core-dn1 4.1).
 Its MIDI CCs follow the Hologram Electronics Chroma Console's published CC
 chart, so a controller set up for that pedal works with it too. DigiPrism is
 not affiliated with Hologram Electronics and uses none of its code.
 
-DIGIPRISM is an entry in core-dn1's Mod Menu (hold a track key). While its
-page is open, DigiPrism owns the audio engine, as DigiSwarm does (core-dn1
-3.2's `core_audio`): the synths are silent, the Digitone's own effects are
-off, and what you hear is the inputs through the pedal. NO gives the audio
-and the screen back. The sequencer keeps running, so PLAY, STOP and TEMPO
+DIGIPRISM is an entry in core-dn1's Mod Menu (hold a track key). While it is the
+active effect, DigiPrism owns the audio engine, as DigiSwarm does (fxkit's
+`core_audio` owner): the synths are silent, the Digitone's own effects are
+off, and what you hear is the inputs through the pedal. NO turns it off and gives the audio and the screen back. The sequencer keeps running, so PLAY, STOP and TEMPO
 still work and the clock can follow the Digitone's tempo. BYPASS (trig 16)
 passes the inputs through dry, with the delays' and the reverb's tails.
 
@@ -27,19 +26,25 @@ it **stays on** after NO, while you play the Digitone as usual, until
 BYPASS. A project saved without DigiPrism starts with it off. With an older
 core SOURCE reads INPUTS ONLY.
 
-**DigiPrism 0.1.1 is a beta (a pre-release).** It is the same code as 0.1 under
-its own name, with its own names for the effects; only names changed. 0.1
-runs on a Digitone mk1, its author's, where it loads and works as expected,
-and 0.1.1 was checked in digikit's emulator
-([digiemu](https://github.com/irpina/digiemu)) on OS 1.43 and 1.44. Its
-source is also in elekloader, as
+**DigiPrism 0.2 is a beta (a pre-release).** It is an effect on fxkit: a
+MIXER on AMP (the inputs' levels and pans, as loud as the Digitone's own
+input), two LFOs on the stock LFO page aimed at its controls, p-locks kept
+in the pattern (RECORD, then hold a trig and turn a control), and MIDI hands
+the screen to the stock UI for the MIDI tracks while it keeps playing.
+Presets are gone: the project keeps its controls, mixer and LFOs, and a
+project saved with 0.1 opens it at its defaults. 0.2 was tested on a
+Digitone mk1 by its author (built before the effects' rename, which changed
+only names); it was also checked in digikit's emulator
+([digiemu](https://github.com/irpina/digiemu)) on OS 1.43 and 1.44. Not yet
+run on a Digitone Keys. Its source is also in elekloader, as
 [mods/digiprism-dn1](https://github.com/irpina/elekloader/tree/main/mods/digiprism-dn1).
-A project saved with 0.1 loads in 0.1.1.
 
 ![DIGIPRISM in core-dn1's Mod Menu](docs/mod-menu.png)
 ![Page 1](docs/page1.png)
 ![Page 2](docs/page2.png)
 ![Page 3](docs/page3.png)
+![The MIXER (AMP)](docs/mixer.png)
+![LFO 1 (LFO), as the stock LFO page](docs/lfo.png)
 ![SETUP](docs/setup.png)
 
 The screenshots are from the emulator, which has no DMA timer 0, so the `C`
@@ -48,33 +53,32 @@ there.
 
 ## Install
 
-You need:
+The easiest way is [elekloader's web page](https://irpina.github.io/elekloader/):
+tick DigiPrism and the **+** beside its *Needs fxkit*; the page takes the core
+it needs. To build it yourself you need:
 - **elekloader from its main branch,** with Python 3.9 or newer (see
-  [its README](https://github.com/irpina/elekloader#install)), or elekloader's
-  web page, which runs it. DigiPrism keeps 7 MB of buffers in the Digitone
-  profile's `bulk` area, which the 0.4.0 app does not know: it refuses
-  DigiPrism.
-- **This mod and its core,** from
+  [its README](https://github.com/irpina/elekloader/#install)). DigiPrism keeps 7 MB of buffers in the
+  Digitone profile's `bulk` area, which the 0.4.0 app does not know: it
+  refuses DigiPrism.
+- **This mod, fxkit and their core,** from
   [this repository's releases](https://github.com/irpina/digiprism/releases):
-  `digiprism-0.1.1.elemod` and `core-dn1-3.2.elemod` for OS 1.43, or
-  `digiprism-0.1.1-os1.44.elemod` and `core-dn1-3.2-os1.44.elemod` for 1.44.
-  DigiPrism needs core-dn1 3.2 or newer. With several effects mods in one build
-  (DigiSwarm, DigiPrism, DigiTide, DigiTriad, DigiReel, DigiHoard,
-  DigiHalo), take core-dn1 4.0 from
-  [elekloader's pre-release](https://github.com/irpina/elekloader/releases/tag/core-dn1-v4.0)
-  instead: it has the RAM for them.
+  `digiprism-0.2.elemod`, `fxkit-0.1.elemod` and `core-dn1-4.1.elemod` for
+  OS 1.43, or the three `-os1.44` files for 1.44. DigiPrism needs core-dn1 4.1
+  or newer and fxkit; every effect on fxkit (DigiSwarm, DigiPrism, DigiTide,
+  DigiTriad, DigiReel, DigiHoard, DigiHalo) fits in one build with them.
 - **The stock OS file:** `Digitone_and_Digitone_Keys_OS1.44.syx` or
   `..._OS1.43.syx`, from
   [Elektron's Digitone downloads](https://www.elektron.se/support-downloads/digitone).
   elekloader recognises the file by its hash.
 
 Build your OS on the command line (or in elekloader's window, run from
-source: **+ Install from file...** both files and tick **digiprism**):
+source: **+ Install from file...** the three files and tick **digiprism**):
 
 ```bash
 python -m elekloader.patch --stock Digitone_and_Digitone_Keys_OS1.44.syx \
-    --mod core-dn1-3.2-os1.44.elemod --mod digiprism-0.1.1-os1.44.elemod \
-    --out Digitone_OS1.44-digiprism.syx --version PR01
+    --mod core-dn1-4.1-os1.44.elemod --mod fxkit-0.1-os1.44.elemod \
+    --mod digiprism-0.2-os1.44.elemod \
+    --out Digitone_OS1.44-digiprism.syx --version PR02
 ```
 
 `--version` is the 4 characters the unit will show. Flash the `.syx` with
@@ -88,8 +92,30 @@ startup menu, and press **TRIG 4** for OS UPGRADE. Then send the stock
 `.syx` with Transfer.
 
 **Opening it:** hold a track key on its own for the Mod Menu, then pick
-DIGIPRISM with its trig key (or YES). NO closes it and gives the synths
+DIGIPRISM with its trig key (or YES). NO turns it off and gives the synths
 back.
+
+## 0.2: on fxkit
+
+From 0.2 DigiPrism is an effect on fxkit ([../fxkit-dn1](https://github.com/irpina/elekloader/tree/main/mods/fxkit-dn1)), as every
+effect in the build is: one at a time is active. Its Mod Menu entry makes it
+the active effect and opens its page; while it is active it owns the audio,
+page or no page, and opening another effect's entry hands that one the audio.
+
+| key | on DigiPrism's page |
+|---|---|
+| SYN1, SYN2, FLTR | its three pages (PRIMARY, SECONDARY and MODULES) |
+| AMP | the MIXER: IN L, IN R (the inputs' levels, as the stock mixer's: 32 unity, up to +24 dB), L PAN, R PAN (where each input sits), BAL, VOL, WDTH (the output's width) |
+| LFO | LFO 1, pressed again LFO 2: the stock LFO page (its knobs, WAVE and SPH as one wave, a turned knob's value under it), at the stock rates; turning DEST opens its list (DigiPrism's controls and the mixer's), YES picks, NO closes |
+| RECORD | LOCK mode: hold a trig and turn a control, and that step has a p-lock of it (the title bar shows the 16 steps, filled where DigiPrism has a lock); FUNC + a trig clears the step; PAGE the next 16 steps. RECORD again (or NO) leaves it |
+| MIDI | the stock UI, for the MIDI tracks and the rest, with DigiPrism playing on; its Mod Menu entry brings the page back |
+| NO | DigiPrism off: the synths again |
+
+The p-locks are the pattern's: they are kept in one synth track's lock table
+(SETUP's LOCK TRACK, T4 unless you pick another), saved and copied with the
+pattern, and play on their steps; that track should play nothing of its own
+(no notes, no arpeggiator) in a pattern with DigiPrism's locks, or its trigs go astray. 0.1's presets are gone: the
+project keeps DigiPrism's controls, mixer and LFOs (tag `DCHR`, 56 bytes).
 
 ## The page
 
@@ -123,7 +149,7 @@ Digitone's and DigiPrism's (see CPU below).
 | Secondary controls | page 2, or FUNC held |
 | Routing, filter style, capture routing | page 3 (DUAL BYPASS in SETUP) |
 | Calibration | LEVL on page 3, and SENS on page 2 |
-| Presets | 8: in SETUP a trig key 1-8 saves the pedal there; FUNC + a trig key 1-8 recalls it |
+| Presets | none from 0.2: the project keeps the pedal, and p-locks (RECORD) follow the pattern |
 | Global settings | YES opens SETUP: SOURCE (INPUTS, or DIGITONE with core-dn1 3.4), INPUT (STEREO, or MONO from input L), CLOCK, BYPASS (trails or cut), DUAL BYPASS, MIDI CC (auto channel or any), CC CLOSED |
 | Expression pedal | not yet |
 
@@ -246,30 +272,22 @@ Digitone's UI task.
   every block, and if the unit stays over 93% for 0.2 s it bypasses the
   pedal at once (no trails) and says so in the title ("CPU full:
   bypassed"); BYPASS turns it back on.
-- **Project data:** the pedal (the effects, which run, their order, the
-  knobs, the secondary controls, the styles and SETUP) and the eight presets
-  are saved with the project (tag `DCHR`, 136 bytes). A preset keeps the
-  effects, which run, their order, FILTER's style, CAPTURE's route and the
-  primary knobs; the secondary controls are the project's. Mods share 480
-  bytes there: DigiPrism fits beside digitables' tables, or beside
-  DigiSwarm, but not beside both, and then the later one in the build's
-  order is left out of the save.
-- **With DigiSwarm:** both may be in one build, and each owns the audio
-  while its own page is open. DigiSwarm comes first in core's table: with
-  DigiPrism's source on DIGITONE, DigiSwarm has the output while its page
-  is open, and DigiPrism carries on when DigiSwarm closes.
+- **Project data:** DigiPrism's controls, its latches and SETUP, with fxkit's mixer and LFOs
+  (`fx_pack`), are saved with the project (tag `DCHR`, 56 bytes; mods share 480 there,
+  and the seven effects, GAIN and fxkit take about 470). The p-locks are the
+  pattern's.
 
 ## Build
 
 With the SDK and a stock OS file:
 
 ```bash
-python -m elekloader.sdk.build . --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/digiprism-0.1.1.elemod
-python -m elekloader.sdk.build . --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/digiprism-0.1.1-os1.44.elemod
+python -m elekloader.sdk.build . --stock Digitone_and_Digitone_Keys_OS1.43.syx   # out/digiprism-0.2.elemod
+python -m elekloader.sdk.build . --stock Digitone_and_Digitone_Keys_OS1.44.syx   # out/digiprism-0.2-os1.44.elemod
 ```
 
-It names no firmware address, so its 1.44 port is empty. It needs core-dn1
-3.2 (`"resources": {"core": "3.2"}`) and an elekloader with the profile's
+It names no firmware address, so its 1.44 port is empty. It needs fxkit and core-dn1
+4.1 (`"requires": ["core", "fxkit"]`, `"resources": {"core": "4.1"}`) and an elekloader with the profile's
 `bulk` area. The source DIGITONE needs core-dn1 3.4's insert audio:
 DigiPrism weak-imports 3.4's `core_audio_caps` (`"weak"` in mod.json),
 which reads 0 with 3.2, and then offers the inputs only. `gentables.py`
@@ -329,8 +347,8 @@ compiled for a computer and fed test signals:
   for one).
 - The source DIGITONE on a unit with a released core: it needs core-dn1
   3.4, which is not released yet.
-- More presets, and gestures and captures saved: the project has room for
-  eight presets, and the Digitone's +Drive no files for mods.
+- Presets, and gestures and captures saved: the project keeps one, and the
+  Digitone's +Drive has no files for mods.
 - Automatic calibration: LEVL and SENS set the input level by hand.
 
 ## Licence
